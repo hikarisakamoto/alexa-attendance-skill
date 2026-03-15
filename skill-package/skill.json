@@ -1,0 +1,37 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "pt-BR": {
+          "summary": "Registre chegadas e saídas de visitantes em uma planilha do Google usando comandos de voz.",
+          "examplePhrases": [
+            "Alexa, abrir controle de presença",
+            "João Silva chegou",
+            "Alexa, abrir controle de presença e registrar chegada de João Silva"
+          ],
+          "name": "Controle de Presença",
+          "description": "Uma skill simples de controle de presença. Diga o nome da pessoa seguido de 'chegou' ou 'saiu' e a skill registra em uma planilha do Google com horários."
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "Diga 'abrir controle de presença', depois diga um nome seguido de 'chegou' ou 'saiu'.",
+      "category": "ORGANIZERS_AND_ASSISTANTS",
+      "distributionCountries": []
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:sa-east-1:1234567890:function:alexa-attendance-skill"
+        }
+      }
+    },
+    "manifestVersion": "1.0",
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "isExportCompliant": true,
+      "containsAds": false,
+      "isChildDirected": false,
+      "usesPersonalInfo": false
+    }
+  }
+}

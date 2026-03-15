@@ -1,0 +1,28 @@
+.env
+credentials.json
+*.exe
+server
+server.exe
+
+# Lambda build artifacts
+bootstrap
+function.zip
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+*.tsbuildinfo
+dist/
+build/
+coverage/
+.nyc_output/
+
+# CDK
+infra/cdk/cdk.context.json
+infra/cdk/cdk.out/
+infra/cdk/dist/
+infra/cdk/test/__snapshots__/

@@ -1,0 +1,94 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "controle de presença",
+      "intents": [
+        {
+          "name": "ArrivalIntent",
+          "slots": [
+            {
+              "name": "name",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "{name} chegou",
+            "{name} está aqui",
+            "{name} aqui",
+            "{name} acabou de chegar",
+            "registrar chegada de {name}",
+            "marcar {name} como presente",
+            "{name} entrou",
+            "chegou {name}",
+            "chegada de {name}",
+            "presença de {name}",
+            "anota a chegada de {name}",
+            "quem chegou foi {name}"
+          ]
+        },
+        {
+          "name": "DepartureIntent",
+          "slots": [
+            {
+              "name": "name",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "{name} saiu",
+            "{name} saindo",
+            "{name} está saindo",
+            "{name} foi embora",
+            "{name} acabou de sair",
+            "registrar saída de {name}",
+            "marcar {name} como saiu",
+            "saiu {name}",
+            "saída de {name}",
+            "anota a saída de {name}",
+            "quem saiu foi {name}",
+            "marcar saída de {name}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": [
+            "ajuda",
+            "me ajuda",
+            "o que você faz",
+            "como funciona",
+            "o que eu posso dizer",
+            "quais são os comandos"
+          ]
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": [
+            "parar",
+            "pare",
+            "chega",
+            "encerrar",
+            "desligar"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": [
+            "cancelar",
+            "cancela",
+            "deixa pra lá",
+            "esquece",
+            "não quero mais"
+          ]
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
+      ]
+    }
+  }
+}
