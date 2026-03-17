@@ -82,7 +82,7 @@ func NewClientFromJSON(ctx context.Context, credentialsJSON []byte, sheetID stri
 	slog.Info("creating sheets client from JSON", "sheetID", sheetID)
 	service, err := sheetsv4.NewService(ctx, option.WithAuthCredentialsJSON(option.ServiceAccount, credentialsJSON))
 	if err != nil {
-		return nil, fmt.Errorf("unable to create sheets service %w", &err)
+		return nil, fmt.Errorf("unable to create sheets service %w", err)
 	}
 	slog.Info("sheets client created successfully")
 	return &Client{api: &googleSheetsAPI{sheetService: service}, sheetID: sheetID}, nil
@@ -105,11 +105,7 @@ func (c *Client) EnsureSheet(ctx context.Context, name string) error {
 	err := c.api.batchUpdate(ctx, c.sheetID, req)
 	if err != nil {
 		var googleErr *googleapi.Error
-		if errors.As(err, *googleErr) && googleErr.Code == 400 && strings.Contains(googleErr.Message, "already exists") {
-			slog.Info("sheet tab already exists", "tabName", name)
-			return nil
-		}
-		if strings.Contains(err.Error(), "already exists") {
+		if errors.As(err, &googleErr) && googleErr.Code == 400 && strings.Contains(googleErr.Message, "already exists") {
 			slog.Info("sheet tab already exists", "tabName", name)
 			return nil
 		}
@@ -163,4 +159,66 @@ func (c *Client) EnsureHeaders(ctx context.Context) error {
 	c.ensuredSheetName = name
 	c.mu.Unlock()
 	return nil
+}
+
+func (c *Client) RecordArrival(ctx context.Context, name string) error {
+	slog.Info("recording arrival", "name", name)
+	now := time.Now().In(brTimeZone).Format("15:04:05")
+	sheet := todaySheetName()
+	row := &sheetsv4.ValueRange{
+		Values: [][]interface{}{{name, now, ""}},
+	}
+	appendRange := fmt.Sprintf("'%s'!A:C", sheet)
+	if err := c.api.appendValues(ctx, c.sheetID, appendRange, row); err != nil {
+		return fmt.Errorf("unable to record arrival: %w", err)
+	}
+
+	slog.Info("arrival recorded", "name", name, "time", now)
+	return nil
+}
+
+func (c *Client) RecordDeparture(ctx context.Context, name string) error {
+	slog.Info("recordong departude", "name", name)
+	sheet := todaySheetName()
+	readRange := fmt.Sprintf("'%s'!A:C", sheet)
+	resp, err := c.api.getValues(ctx, c.sheetID, readRange)
+	if err != nil {
+		return fmt.Errorf("unable to read sheet: %w", err)
+	}
+	slog.Info("read rows from sheet", "rows", len(resp.Values), "tabName", sheet)
+
+	targetRow := findOpenArrival(resp.Values, name)
+	if targetRow == -1 {
+		return fmt.Errorf("no open arrival found for %q", name)
+	}
+
+	now := time.Now().In(brTimeZone).Format("15:04:05")
+	slog.Info("updating departure", "name", name, "row", targetRow)
+	updateRange := fmt.Sprintf("'%s'!C%d", sheet, targetRow)
+	update := &sheetsv4.ValueRange{
+		Values: [][]interface{}{{now}},
+	}
+	if err := c.api.updateValues(ctx, c.sheetID, updateRange, update); err != nil {
+		return fmt.Errorf("unable to record departure: %w", err)
+	}
+	slog.Info("departure recorded", "name", name, "time", now)
+	return nil
+}
+
+func findOpenArrival(rows [][]interface{}, name string) int {
+	for i := len(rows) - 1; i >= 1; i-- {
+		row := rows[i]
+		if len(row) == 0 {
+			continue
+		}
+		rowName := fmt.Sprintf("%v", row[0])
+		if !strings.EqualFold(rowName, name) {
+			continue
+		}
+		leaveEmpty := len(row) < 3 || fmt.Sprintf("%v", row[2]) == ""
+		if leaveEmpty {
+			return i + 1 // Sheet rows are 1-indexed
+		}
+	}
+	return -1
 }
