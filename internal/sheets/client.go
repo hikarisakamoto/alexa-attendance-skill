@@ -109,6 +109,10 @@ func (c *Client) EnsureSheet(ctx context.Context, name string) error {
 			slog.Info("sheet tab already exists", "tabName", name)
 			return nil
 		}
+		if strings.Contains(err.Error(), "already exists") {
+			slog.Info("sheet tab already exists", "tabName", name)
+			return nil
+		}
 		return fmt.Errorf("unable to create sheet %q: %w", name, err)
 	}
 	slog.Info("sheet tab created", "tabName", name)
