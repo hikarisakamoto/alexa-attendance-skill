@@ -2,6 +2,7 @@ package alexa
 
 import (
 	"context"
+	"log/slog"
 	"time"
 )
 
@@ -10,65 +11,51 @@ const (
 	maxNameLength  = 100
 )
 
-const (
-	RequestTypeLaunch       = "LaunchRequest"
-	RequestTypeIntent       = "IntentRequest"
-	RequestTypeSessionEnded = "SessionEndedRequest"
-
-	IntentArrival      = "ArrivalIntent"
-	IntentDeparture    = "DepartureIntent"
-	IntentHelp         = "AMAZON.HelpIntent"
-	IntentStop         = "AMAZON.SpotIntent"
-	IntentCancel       = "AMAZON.CancelIntent"
-	IntentFallback     = "AMAZON.FallbackIntent"
-	IntentNavigateHome = "AMAZON.NavigateHomeIntent"
-)
-
-type Request struct {
-	Version string      `json:"version"`
-	Session Session     `json:"session"`
-	Body    RequestBody `json:"request"`
-}
-
-type Session struct {
-	Application Application `json:"application"`
-}
-
-type Application struct {
-	ApplicationID string `json:"applicationId"`
-}
-
-type RequestBody struct {
-	Type   string `json:"type"`
-	Intent Intent `json:"intent"`
-}
-
-type Intent struct {
-	Name  string          `json:"name"`
-	Slots map[string]Slot `json:"slots"`
-}
-
-type Slot struct {
-	Name string `json:"name"`
-}
-
-type Response struct {
-	Version  string       `json:"version"`
-	Response ResponseBody `json:"response"`
-}
-
-type ResponseBody struct {
-	OutputSpeech     *OutputSpeech `json:"outputSpeech,omitempty"`
-	ShouldEndSession bool          `json:"shouldEndSession"`
-}
-
-type OutputSpeech struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
 type SheetsService interface {
 	EnsureHeaders(ctx context.Context) error
 	RecordArrival(ctx context.Context, name string) error
 	RecordDeparture(ctx context.Context, name string) error
+}
+
+func HandleAlexaRequest(ctx context.Context, req Request, sheetsService SheetsService, expectedAppID string) Response {
+	slog.Info("handling Alexa request", "type", req.Body.Type)
+
+	if expectedAppID != "" {
+		if req.Session.Application.ApplicationID != expectedAppID {
+			slog.Warn("invalid application ID", "expected", expectedAppID, "actual", req.Session.Application.ApplicationID)
+			return buildResponse("Desculpe, este aplicativo não está autorizado.", true)
+		}
+	}
+
+	switch req.Body.Type {
+	case RequestTypeLaunch:
+		return buildResponse("Bem-vindo ao controle de presença. Você pode dizer que alguém chegou ou saiu.", false)
+	case RequestTypeIntent:
+		return handleIntent(ctx, req.Body.Intent, sheetsService)
+	case RequestTypeSessionEnded:
+		return buildResponse("", true)
+	default:
+		return buildResponse("Não tenho certeza de como lidar com isso.", true)
+	}
+}
+
+func handleIntent(ctx context.Context, intent Intent, sheetsService SheetsService) Response {
+	panic("unimplemented")
+}
+
+func buildResponse(text string, endSession bool) Response {
+	resp := Response{
+		Version: "1.0",
+		Response: ResponseBody{
+			ShouldEndSession: endSession,
+		},
+	}
+
+	if text != "" {
+		resp.Response.OutputSpeech = &OutputSpeech{
+			Type: "PlainText",
+			Text: text,
+		}
+	}
+	return resp
 }
