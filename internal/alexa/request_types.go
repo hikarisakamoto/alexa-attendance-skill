@@ -8,7 +8,7 @@ const (
 	IntentArrival      = "ArrivalIntent"
 	IntentDeparture    = "DepartureIntent"
 	IntentHelp         = "AMAZON.HelpIntent"
-	IntentStop         = "AMAZON.SpotIntent"
+	IntentStop         = "AMAZON.StopIntent"
 	IntentCancel       = "AMAZON.CancelIntent"
 	IntentFallback     = "AMAZON.FallbackIntent"
 	IntentNavigateHome = "AMAZON.NavigateHomeIntent"
@@ -39,5 +39,6 @@ type Intent struct {
 }
 
 type Slot struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
