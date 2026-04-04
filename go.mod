@@ -3,6 +3,7 @@ module alexa-attendance-skill
 go 1.25.7
 
 require (
+	github.com/aws/aws-lambda-go v1.54.0
 	github.com/aws/aws-sdk-go-v2/config v1.32.14
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.5
 	google.golang.org/api v0.271.0
