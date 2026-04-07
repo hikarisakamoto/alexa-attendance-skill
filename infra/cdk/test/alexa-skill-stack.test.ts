@@ -85,6 +85,44 @@ describe("AlexaSkillStack", () => {
     });
     // ── Sheet Setup Lambda ──────────────────────────────────────────────────────   
 
+    test("creates SheetSetup Lambda with correct runtime and architecture", () => {
+        template.hasResourceProperties("AWS::Lambda::Function", {
+            Runtime: "provided.al2023",
+            Architecture: ["arm64"],
+            Handler: "bootstrap",
+            FunctionName: "alexa-sheet-setup",
+        });
+    });
+
+    test("SheetSetup Lambda has correct memory and timeout", () => {
+        template.hasResourceProperties("AWS::Lambda::Function", {
+            FunctionName: "alexa-sheet-setup",
+            MemorySize: 128,
+            Timeout: 30,
+        });
+    });
+
+    test("SheetSetup Lambda has required environment variable", () => {
+        template.hasResourceProperties("AWS::Lambda::Function", {
+            FunctionName: "alexa-sheet-setup",
+            Environment: {
+                Variables: {
+                    GOOGLE_SHEET_ID: "test-sheet-id",
+                    GOOGLE_CREDENTIALS_SECRET: "alexa-skill/google-credentials",
+                    TZ: "America/Sao_Paulo",
+                },
+            },
+        });
+    });
+
+    test("creates EventBridge rule targeting SheetSetup Lambda", () => {
+        template.hasResourceProperties("AWS::Events::Rule", {
+            Name: "alexa-sheet-setup-daily",
+            SheduleExpression: "cron(0 3 * * ? *)",
+            State: "ENABLED",
+        });
+    });
+
     // ── Alexa skill ID permission ───────────────────────────────────────────────
 });
 
