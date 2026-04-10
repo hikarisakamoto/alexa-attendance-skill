@@ -165,7 +165,7 @@ export class AlexaSkillStack extends cdk.Stack {
         });
 
         new cdk.CfnOutput(this, "LambdaFunctionName", {
-            description: "Lambda functino name",
+            description: "Lambda function name",
             value: fn.functionName,
         });
     }
