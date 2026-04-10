@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Alexa attendance skill — Lambda function with Secrets Manager integration
+
+Parameters:
+  GoogleSheetId:
+    Type: String
+    Description: Google Sheets spreadsheet ID
+  AlexaSkillId:
+    Type: String
+    Default: ""
+    Description: Alexa Skill ID (e.g. amzn1.ask.skill.c4943619-155a-47c2-b697-cf346a9918e1)
+  GoogleCredentialsSecretName:
+    Type: String
+    Default: alexa-skill/google-credentials
+    Description: Secrets Manager secret name containing Google service account JSON
+  LambdaCodeS3Bucket:
+    Type: String
+    Description: S3 bucket containing function.zip
+  LambdaCodeS3Key:
+    Type: String
+    Default: alexa-skill/function.zip
+    Description: S3 key for function.zip
+  SheetSetupCodeS3Key:
+    Type: String
+    Default: alexa-skill/sheet-setup.zip
+    Description: S3 key for sheet-setup function zip
+
+Conditions:
+  HasAlexaSkillId: !Not [!Equals [!Ref AlexaSkillId, ""]]
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: alexa-skill-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SecretsManagerRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${GoogleCredentialsSecretName}-*"
+
+  AlexaSkillFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: alexa-attendance-skill
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Handler: bootstrap
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      MemorySize: 128
+      Environment:
+        Variables:
+          GOOGLE_SHEET_ID: !Ref GoogleSheetId
+          GOOGLE_CREDENTIALS_SECRET: !Ref GoogleCredentialsSecretName
+          ALEXA_SKILL_ID: !Ref AlexaSkillId
+          TZ: America/Sao_Paulo
+
+  AlexaSkillLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AlexaSkillFunction}"
+      RetentionInDays: 14
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  AlexaSkillPermission:
+    Type: AWS::Lambda::Permission
+    Condition: HasAlexaSkillId
+    Properties:
+      FunctionName: !GetAtt AlexaSkillFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: alexa-appkit.amazon.com
+      EventSourceToken: !Ref AlexaSkillId
+
+  # ── Sheet Setup Lambda (scheduled daily) ──
+
+  SheetSetupFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: alexa-sheet-setup
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Handler: bootstrap
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref SheetSetupCodeS3Key
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          GOOGLE_SHEET_ID: !Ref GoogleSheetId
+          GOOGLE_CREDENTIALS_SECRET: !Ref GoogleCredentialsSecretName
+          TZ: America/Sao_Paulo
+
+  SheetSetupLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SheetSetupFunction}"
+      RetentionInDays: 14
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+
+  SheetSetupScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: alexa-sheet-setup-daily
+      Description: Creates the daily Google Sheets tab at midnight São Paulo time
+      ScheduleExpression: "cron(0 3 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt SheetSetupFunction.Arn
+          Id: SheetSetupTarget
+
+  SheetSetupSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SheetSetupFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt SheetSetupScheduleRule.Arn
+
+Outputs:
+  LambdaFunctionArn:
+    Description: Lambda function ARN — use this as the Alexa skill endpoint
+    Value: !GetAtt AlexaSkillFunction.Arn
+  LambdaFunctionName:
+    Description: Lambda function name
+    Value: !Ref AlexaSkillFunction
