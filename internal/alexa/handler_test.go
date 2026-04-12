@@ -7,11 +7,13 @@ import (
 )
 
 type mockSheetsService struct {
-	ensureHeadersErr   error
-	recordArrivalErr   error
-	recordDepartureErr error
-	recordedArrival    string
-	recordedDeparture  string
+	ensureHeadersErr       error
+	recordArrivalErr       error
+	recordDepartureErr     error
+	recordDepartureOnlyErr error
+	recordedArrival        string
+	recordedDeparture      string
+	recordedDepartureOnly  string
 }
 
 func (m *mockSheetsService) EnsureHeaders(ctx context.Context) error {
@@ -28,14 +30,21 @@ func (m *mockSheetsService) RecordDeparture(ctx context.Context, name string) er
 	return m.recordDepartureErr
 }
 
+func (m *mockSheetsService) RecordDepartureOnly(ctx context.Context, name string) error {
+	m.recordedDepartureOnly = name
+	return m.recordDepartureOnlyErr
+}
+
 func TestHandleAlexaRequest(t *testing.T) {
 	tests := []struct {
-		name          string
-		expectedAppID string
-		request       Request
-		mock          *mockSheetsService
-		wantSpeech    string
-		wantEnd       bool
+		name              string
+		expectedAppID     string
+		request           Request
+		mock              *mockSheetsService
+		wantSpeech        string
+		wantEnd           bool
+		wantSessionAttr   string // key expected in SessionAttributes (empty = don't check)
+		wantRecordedDepOn string // expected name passed to RecordDepartureOnly
 	}{
 		{
 			name:          "Launch Request",
@@ -164,7 +173,7 @@ func TestHandleAlexaRequest(t *testing.T) {
 			wantEnd:    true,
 		},
 		{
-			name:          "Departure Intent No Open Arrival",
+			name:          "Departure Intent No Open Arrival asks confirmation",
 			expectedAppID: "",
 			request: Request{
 				Body: RequestBody{
@@ -180,7 +189,54 @@ func TestHandleAlexaRequest(t *testing.T) {
 			mock: &mockSheetsService{
 				recordDepartureErr: errors.New("no open arrival found"),
 			},
-			wantSpeech: "Não encontrei uma chegada em aberto para Carlos Pereira.",
+			wantSpeech:    "Não encontrei uma chegada em aberto para Carlos Pereira. Deseja registrar apenas a saída?",
+			wantEnd:       false,
+			wantSessionAttr: "pendingDepartureName",
+		},
+		{
+			name:          "YesIntent with pending departure records departure only",
+			expectedAppID: "",
+			request: Request{
+				Session: Session{
+					Attributes: map[string]interface{}{"pendingDepartureName": "Carlos Pereira"},
+				},
+				Body: RequestBody{
+					Type:   RequestTypeIntent,
+					Intent: Intent{Name: IntentYes},
+				},
+			},
+			mock:              &mockSheetsService{},
+			wantSpeech:        "Entendido. A saída de Carlos Pereira foi registrada.",
+			wantEnd:           true,
+			wantRecordedDepOn: "Carlos Pereira",
+		},
+		{
+			name:          "YesIntent without pending departure",
+			expectedAppID: "",
+			request: Request{
+				Body: RequestBody{
+					Type:   RequestTypeIntent,
+					Intent: Intent{Name: IntentYes},
+				},
+			},
+			mock:       &mockSheetsService{},
+			wantSpeech: "Não tenho nenhuma ação pendente.",
+			wantEnd:    true,
+		},
+		{
+			name:          "NoIntent with pending departure cancels",
+			expectedAppID: "",
+			request: Request{
+				Session: Session{
+					Attributes: map[string]interface{}{"pendingDepartureName": "Carlos Pereira"},
+				},
+				Body: RequestBody{
+					Type:   RequestTypeIntent,
+					Intent: Intent{Name: IntentNo},
+				},
+			},
+			mock:       &mockSheetsService{},
+			wantSpeech: "Tudo bem. Nenhum registro foi feito.",
 			wantEnd:    true,
 		},
 		{
@@ -212,6 +268,21 @@ func TestHandleAlexaRequest(t *testing.T) {
 				}
 			} else if resp.Response.OutputSpeech != nil {
 				t.Errorf("expected no OutputSpeech, got %v", resp.Response.OutputSpeech)
+			}
+
+			if tc.wantSessionAttr != "" {
+				if resp.SessionAttributes == nil {
+					t.Fatalf("expected SessionAttributes with key %q, got nil", tc.wantSessionAttr)
+				}
+				if _, ok := resp.SessionAttributes[tc.wantSessionAttr]; !ok {
+					t.Errorf("SessionAttributes missing key %q, got %v", tc.wantSessionAttr, resp.SessionAttributes)
+				}
+			}
+
+			if tc.wantRecordedDepOn != "" {
+				if tc.mock.recordedDepartureOnly != tc.wantRecordedDepOn {
+					t.Errorf("got recordedDepartureOnly = %q, want %q", tc.mock.recordedDepartureOnly, tc.wantRecordedDepOn)
+				}
 			}
 		})
 	}

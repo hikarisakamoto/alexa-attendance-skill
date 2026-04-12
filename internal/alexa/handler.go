@@ -19,6 +19,7 @@ type SheetsService interface {
 	EnsureHeaders(ctx context.Context) error
 	RecordArrival(ctx context.Context, name string) error
 	RecordDeparture(ctx context.Context, name string) error
+	RecordDepartureOnly(ctx context.Context, name string) error
 }
 
 func NewHttpHandler(sheetsService SheetsService, expectedAppID string) http.HandlerFunc {
@@ -69,7 +70,7 @@ func HandleAlexaRequest(ctx context.Context, req Request, sheetsService SheetsSe
 	case RequestTypeLaunch:
 		return buildResponse("Bem-vindo ao controle de presença. Você pode dizer que alguém chegou ou saiu.", false)
 	case RequestTypeIntent:
-		return handleIntent(ctx, req.Body.Intent, sheetsService)
+		return handleIntent(ctx, req.Body.Intent, req.Session, sheetsService)
 	case RequestTypeSessionEnded:
 		return buildResponse("", true)
 	default:
@@ -77,12 +78,16 @@ func HandleAlexaRequest(ctx context.Context, req Request, sheetsService SheetsSe
 	}
 }
 
-func handleIntent(ctx context.Context, intent Intent, sheetsService SheetsService) Response {
+func handleIntent(ctx context.Context, intent Intent, session Session, sheetsService SheetsService) Response {
 	switch intent.Name {
 	case IntentArrival:
 		return handleArrival(ctx, intent, sheetsService)
 	case IntentDeparture:
 		return handleDeparture(ctx, intent, sheetsService)
+	case IntentYes:
+		return handleYes(ctx, session, sheetsService)
+	case IntentNo:
+		return handleNo(session)
 	case IntentHelp:
 		return buildResponse("Você pode dizer algo como: João Silva chegou, ou João Silva saiu.", false)
 	case IntentStop, IntentCancel:
@@ -105,12 +110,38 @@ func handleDeparture(ctx context.Context, intent Intent, sheetsService SheetsSer
 	if err := sheetsService.RecordDeparture(ctx, name); err != nil {
 		slog.Error("error recording departure", "error", err)
 		if strings.Contains(err.Error(), "no open arrival found") {
-			return buildResponse(fmt.Sprintf("Não encontrei uma chegada em aberto para %s.", name), true)
+			resp := buildResponse(
+				fmt.Sprintf("Não encontrei uma chegada em aberto para %s. Deseja registrar apenas a saída?", name),
+				false,
+			)
+			resp.SessionAttributes = map[string]interface{}{"pendingDepartureName": name}
+			return resp
 		}
 		return buildResponse("Desculpe, tive um problema ao registrar a saída. Tente novamente.", false)
 	}
 
 	return buildResponse(fmt.Sprintf("Entendido. A saída de %s foi registrada.", name), true)
+}
+
+func handleYes(ctx context.Context, session Session, sheetsService SheetsService) Response {
+	name, _ := session.Attributes["pendingDepartureName"].(string)
+	if name == "" {
+		return buildResponse("Não tenho nenhuma ação pendente.", true)
+	}
+
+	if err := sheetsService.RecordDepartureOnly(ctx, name); err != nil {
+		slog.Error("error recording departure-only", "error", err)
+		return buildResponse("Desculpe, tive um problema ao registrar a saída. Tente novamente.", false)
+	}
+
+	return buildResponse(fmt.Sprintf("Entendido. A saída de %s foi registrada.", name), true)
+}
+
+func handleNo(session Session) Response {
+	if _, ok := session.Attributes["pendingDepartureName"].(string); ok {
+		return buildResponse("Tudo bem. Nenhum registro foi feito.", true)
+	}
+	return buildResponse("Ok.", true)
 }
 
 func handleArrival(ctx context.Context, intent Intent, sheetsService SheetsService) Response {

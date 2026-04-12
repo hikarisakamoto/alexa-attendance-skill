@@ -209,6 +209,21 @@ func (c *Client) RecordDeparture(ctx context.Context, name string) error {
 	return nil
 }
 
+func (c *Client) RecordDepartureOnly(ctx context.Context, name string) error {
+	slog.Info("recording departure only", "name", name)
+	now := time.Now().In(brTimeZone).Format("15:04:05")
+	sheet := todaySheetName()
+	row := &sheetsv4.ValueRange{
+		Values: [][]interface{}{{name, "", now}},
+	}
+	appendRange := fmt.Sprintf("'%s'!A:C", sheet)
+	if err := c.api.appendValues(ctx, c.sheetID, appendRange, row); err != nil {
+		return fmt.Errorf("unable to record departure-only: %w", err)
+	}
+	slog.Info("departure-only recorded", "name", name, "time", now)
+	return nil
+}
+
 func findOpenArrival(rows [][]interface{}, name string) int {
 	for i := len(rows) - 1; i >= 1; i-- {
 		row := rows[i]

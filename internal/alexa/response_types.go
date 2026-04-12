@@ -1,8 +1,9 @@
 package alexa
 
 type Response struct {
-	Version  string       `json:"version"`
-	Response ResponseBody `json:"response"`
+	Version           string                 `json:"version"`
+	SessionAttributes map[string]interface{} `json:"sessionAttributes,omitempty"`
+	Response          ResponseBody           `json:"response"`
 }
 
 type ResponseBody struct {

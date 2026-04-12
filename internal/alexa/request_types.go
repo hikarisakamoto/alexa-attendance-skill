@@ -12,6 +12,8 @@ const (
 	IntentCancel       = "AMAZON.CancelIntent"
 	IntentFallback     = "AMAZON.FallbackIntent"
 	IntentNavigateHome = "AMAZON.NavigateHomeIntent"
+	IntentYes          = "AMAZON.YesIntent"
+	IntentNo           = "AMAZON.NoIntent"
 )
 
 type Request struct {
@@ -21,7 +23,8 @@ type Request struct {
 }
 
 type Session struct {
-	Application Application `json:"application"`
+	Application Application            `json:"application"`
+	Attributes  map[string]interface{} `json:"attributes"`
 }
 
 type Application struct {

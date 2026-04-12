@@ -366,6 +366,37 @@ func TestRecordDeparture_UpdatesCorrectRow(t *testing.T) {
 	}
 }
 
+// --- RecordDepartureOnly tests ---
+
+func TestRecordDepartureOnly_Success(t *testing.T) {
+	api := &mockSheetsAPI{}
+	c := newTestClient(api)
+	if err := c.RecordDepartureOnly(t.Context(), "Maria Silva"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if api.appendedValues == nil {
+		t.Fatal("expected valuesAppend to be called")
+	}
+	row := api.appendedValues.Values[0]
+	if row[0] != "Maria Silva" {
+		t.Errorf("expected name %q, got %q", "Maria Silva", row[0])
+	}
+	if row[1] != "" {
+		t.Errorf("expected empty arrival, got %q", row[1])
+	}
+	if row[2] == "" {
+		t.Error("expected departure time to be set, got empty")
+	}
+}
+
+func TestRecordDepartureOnly_Error(t *testing.T) {
+	api := &mockSheetsAPI{appendValuesErr: errors.New("api failure")}
+	c := newTestClient(api)
+	if err := c.RecordDepartureOnly(t.Context(), "Maria Silva"); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
 // --- todaySheetName test ---
 
 func TestTodaySheetName_Format(t *testing.T) {
