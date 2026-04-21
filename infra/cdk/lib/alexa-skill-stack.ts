@@ -20,7 +20,7 @@ export class AlexaSkillStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props: AlexaSkillStackProps) {
         super(scope, id, props);
 
-        const projectRoot = path.join(__dirname, "..", "..", "..", "..");
+        const projectRoot = path.join(__dirname, "..", "..", "..");
         const artifactPath = props.artifactPath ? path.resolve(props.artifactPath) : undefined;
         const sheetSetupArtifactPath = props.sheetSetupArtifactPath
             ? path.resolve(props.sheetSetupArtifactPath)
