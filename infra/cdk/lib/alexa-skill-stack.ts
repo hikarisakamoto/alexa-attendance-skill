@@ -29,7 +29,7 @@ export class AlexaSkillStack extends cdk.Stack {
         // ── Alexa Lambda ──────────────────────────────────────────────────────────
 
         const logGroup = new logs.LogGroup(this, "AlexaSkillLogGroup", {
-            logGroupName: "aws/lambda/alexa-attendance-skill",
+            logGroupName: "/aws/lambda/alexa-attendance-skill",
             retention: logs.RetentionDays.TWO_WEEKS,
             removalPolicy: cdk.RemovalPolicy.RETAIN
         });
@@ -95,7 +95,7 @@ export class AlexaSkillStack extends cdk.Stack {
         // ── Sheet Setup Lambda (scheduled daily) ─────────────────────────────────
 
         const sheetSetupLogGroup = new logs.LogGroup(this, "SheetSetupLogGroup", {
-            logGroupName: "aws/lambda/alexa-sheet-setup",
+            logGroupName: "/aws/lambda/alexa-sheet-setup",
             retention: logs.RetentionDays.TWO_WEEKS,
             removalPolicy: cdk.RemovalPolicy.RETAIN
         });
