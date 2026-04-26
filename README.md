@@ -1,91 +1,143 @@
 # Alexa Attendance Skill
 
-A voice-controlled attendance tracking system for Amazon Alexa. Record arrivals and departures by simply speaking a person's name, and have everything automatically logged to a Google Sheets spreadsheet.
+Voice-based attendance tracking for Amazon Alexa. Say a person's name, record their arrival or departure, and keep the log in Google Sheets without touching a keyboard.
+
+## Example Conversation
 
 > "Alexa, open attendance control"
 > "Joao Silva arrived"
 > "Got it. Joao Silva has been recorded as present."
 
-## How It Works
+## Overview
 
-The skill runs as an AWS Lambda function that receives voice commands from Alexa and writes entries to a Google Sheets spreadsheet. Each day gets its own sheet tab (named by date), with columns for **Name**, **Arrival**, and **Departure**.
+The skill runs on AWS Lambda and writes attendance events to Google Sheets. Each day gets its own tab, with columns for **Name**, **Arrival**, and **Departure**.
 
-A second Lambda function runs daily on a schedule to create the new sheet tab before the workday begins.
+A second Lambda function runs on a schedule to create the next daily sheet automatically before the workday starts.
 
-### Voice Commands
+### Supported Intents
 
 | Action | Example phrases |
 |---|---|
 | Record arrival | "Joao arrived", "register Joao's arrival", "mark Joao as present" |
 | Record departure | "Joao left", "register Joao's departure", "Joao is leaving" |
 
-When a departure is recorded, the skill finds the person's most recent open arrival row and fills in the departure time. If no arrival exists, it asks for confirmation before recording a departure-only entry.
+When a departure is recorded, the skill updates the most recent open arrival row for that person. If no arrival exists, Alexa asks for confirmation before saving a departure-only entry.
 
 ## Architecture
 
-```
-Alexa Device  -->  Alexa Service  -->  Lambda (Go, ARM64)  -->  Google Sheets API
-                                            |
-                                       AWS Secrets Manager
-                                       (Google credentials)
+```text
+Alexa Device  ->  Alexa Service  ->  Lambda (Go, ARM64)  ->  Google Sheets API
+                                           |
+                                      AWS Secrets Manager
+                                      (Google credentials)
 
-EventBridge (daily cron)  -->  Sheet-Setup Lambda  -->  Google Sheets API
+EventBridge (daily cron)  ->  Sheet-Setup Lambda  ->  Google Sheets API
 ```
 
 **Tech stack:** Go, AWS Lambda, AWS CDK (TypeScript), Google Sheets API v4, Alexa Skills Kit
 
 ## Prerequisites
 
-- **AWS account** with permissions to create Lambda functions, IAM roles, and Secrets Manager secrets
-- **Amazon Developer account** to create and configure the Alexa skill
-- **Google Cloud project** with the Sheets API enabled
-- **Google service account** with Editor access to the target spreadsheet
-- **Go 1.25+** for building the Lambda binaries
-- **Node.js 18+** for CDK deployment (if using CDK)
-- **GNU Make** or **PowerShell** (Windows) for running build/deploy commands
+- AWS account with permissions for Lambda, IAM, EventBridge, CloudFormation, and Secrets Manager
+- Amazon Developer account for the Alexa skill
+- Google Cloud project with the Sheets API enabled
+- Google service account with Editor access to the target spreadsheet
+- Go 1.25+
+- Node.js 18+
+- GNU Make or PowerShell
+- ASK CLI for syncing the interaction model from the command line
 
-## Setup
+## Recommended Setup Flow
 
-### 1. Google Sheets
+### 1. Prepare Google Sheets
 
-1. Create a new Google Sheets spreadsheet (or use an existing one).
+1. Create the target spreadsheet.
 2. Create a Google Cloud service account with the Sheets API enabled.
-3. Share the spreadsheet with the service account email (Editor role).
-4. Download the service account JSON credentials file.
+3. Share the spreadsheet with the service account email as **Editor**.
+4. Download the service account JSON file as `credentials.json`.
 
-### 2. AWS Secrets Manager
+### 2. Store `credentials.json` in AWS Secrets Manager
 
-Store the Google credentials JSON in AWS Secrets Manager:
+Create the secret the first time:
 
 ```bash
-make store-secret
-# Expects a credentials.json file in the project root
+aws secretsmanager create-secret \
+  --name alexa-skill/google-credentials \
+  --secret-string file://credentials.json \
+  --region sa-east-1
 ```
 
-### 3. Alexa Skill
-
-1. Create a new custom Alexa skill in the [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask).
-2. Set the invocation name to **"controle de presenca"** (or your preferred name).
-3. Import the interaction model from `skill-package/interactionModels/pt-BR.json`.
-4. Set the skill endpoint to the Lambda function ARN (obtained after deployment).
-
-### 4. Deploy
-
-Three deployment options are available:
-
-#### Option A: AWS CDK (recommended)
+Update the secret later if it already exists:
 
 ```bash
-# Build Lambda binaries (run in WSL or Linux for cross-compilation)
-make build-all-artifacts
+aws secretsmanager put-secret-value \
+  --secret-id alexa-skill/google-credentials \
+  --secret-string file://credentials.json \
+  --region sa-east-1
+```
 
-# Deploy the stack
+If you prefer the helper target, `make store-secret` wraps the first-time creation flow.
+
+### 3. Create and Configure the Alexa Skill
+
+1. Create a custom Alexa skill in the [Alexa Developer Console](https://developer.amazon.com/alexa/console/ask).
+2. Set the invocation name to `controle de presenca` or your preferred variation.
+3. Use the interaction model from `skill-package/interactionModels/pt-BR.json`.
+4. After deployment, point the skill endpoint to the Lambda ARN.
+
+### 4. Build the Lambda Artifacts
+
+```bash
+make build-all-artifacts
+```
+
+Run this from Linux or WSL so the Lambda binaries are built for `linux/arm64`.
+
+### 5. Deploy with CDK
+
+The CDK workflow is the recommended path.
+
+If this is a completely new AWS account/region deployment, bootstrap CDK first:
+
+```bash
+cd infra/cdk
+npx cdk bootstrap aws://ACCOUNT_ID/sa-east-1
+```
+
+Deploy the stack:
+
+```bash
 make deploy-cdk \
   GOOGLE_SHEET_ID=your-spreadsheet-id \
   ALEXA_SKILL_ID=amzn1.ask.skill.xxx
 ```
 
-#### Option B: CloudFormation
+> Important: whenever you run raw CDK app commands such as `cdk synth`, `cdk diff`, or `cdk deploy`, do not forget to pass `-c googleSheetId=xxx`. The CDK app expects that context value.
+
+Example:
+
+```bash
+cd infra/cdk
+npx cdk diff \
+  -c googleSheetId=your-spreadsheet-id \
+  -c alexaSkillId=amzn1.ask.skill.xxx \
+  -c googleCredentialsSecretName=alexa-skill/google-credentials \
+  -c region=sa-east-1
+```
+
+### 6. Sync the Interaction Model with ASK CLI
+
+After creating the skill, or whenever `skill-package/interactionModels/pt-BR.json` changes, push the latest model with ASK CLI:
+
+```bash
+ask smapi set-interaction-model -s amzn1.ask.skill.id -g development -l pt-BR --interaction-model "$(cat skill-package/interactionModels/pt-BR.json)"
+```
+
+Replace `amzn1.ask.skill.id` with your real skill ID.
+
+## Other Deployment Options
+
+### CloudFormation
 
 ```bash
 make deploy-cfn \
@@ -94,7 +146,7 @@ make deploy-cfn \
   S3_BUCKET=your-deployment-bucket
 ```
 
-#### Option C: Direct Lambda CLI
+### Direct Lambda CLI
 
 ```bash
 # First-time creation
@@ -106,43 +158,48 @@ make create-lambda \
 make deploy-lambda
 ```
 
-#### PowerShell (Windows)
+### PowerShell
 
 ```powershell
 .\deploy.ps1 deploy-cdk -GoogleSheetId "your-spreadsheet-id" -AlexaSkillId "amzn1.ask.skill.xxx"
 ```
 
-### Configuration
+## Configuration
 
-| Environment Variable | Description | Default |
+### Runtime Environment Variables
+
+| Variable | Description | Default |
 |---|---|---|
-| `GOOGLE_SHEET_ID` | Google Sheets spreadsheet ID | *(required)* |
-| `ALEXA_SKILL_ID` | Alexa Skill ID for request validation | *(optional)* |
+| `GOOGLE_SHEET_ID` | Google Sheets spreadsheet ID | required |
+| `ALEXA_SKILL_ID` | Alexa skill ID used for request validation | optional |
 | `GOOGLE_CREDENTIALS_SECRET` | Secrets Manager secret name | `alexa-skill/google-credentials` |
-| `TZ` | Timezone for timestamps | `America/Sao_Paulo` |
+| `TZ` | Time zone used for timestamps | `America/Sao_Paulo` |
 
-| Make Variable | Description | Default |
+### Common Make Variables
+
+| Variable | Description | Default |
 |---|---|---|
-| `REGION` | AWS region | `eu-west-1` |
-| `FUNCTION_NAME` | Lambda function name | `alexa-attendance-skill` |
+| `REGION` | AWS region | `sa-east-1` |
+| `FUNCTION_NAME` | Main Lambda function name | `alexa-attendance-skill` |
+| `SECRET_NAME` | Secrets Manager secret name | `alexa-skill/google-credentials` |
 
 ## Project Structure
 
-```
+```text
 alexa-attendance-skill/
-├── cmd/
-│   ├── lambda/          # Alexa skill Lambda entry point
-│   └── sheet-setup/     # Daily sheet creation Lambda
-├── internal/
-│   ├── alexa/           # Alexa request/response handling
-│   ├── sheets/          # Google Sheets API client
-│   └── awsutil/         # AWS Secrets Manager integration
-├── infra/
-│   ├── cdk/             # AWS CDK stack (TypeScript)
-│   └── cloudformation/  # CloudFormation template
-├── skill-package/       # Alexa skill manifest and interaction model
-├── Makefile             # Build and deploy targets
-└── deploy.ps1           # PowerShell deployment script
+|-- cmd/
+|   |-- lambda/          # Alexa skill Lambda entry point
+|   `-- sheet-setup/     # Daily sheet creation Lambda
+|-- internal/
+|   |-- alexa/           # Alexa request and response handling
+|   |-- awsutil/         # AWS Secrets Manager integration
+|   `-- sheets/          # Google Sheets client logic
+|-- infra/
+|   |-- cdk/             # AWS CDK stack
+|   `-- cloudformation/  # CloudFormation template
+|-- skill-package/       # Alexa skill manifest and interaction model
+|-- Makefile             # Build and deploy commands
+`-- deploy.ps1           # PowerShell deployment helper
 ```
 
 ## Testing
@@ -151,7 +208,7 @@ alexa-attendance-skill/
 go test ./...
 ```
 
-The test suite covers Alexa request handling (intent routing, session state, validation) and Google Sheets operations (row creation, updates, sheet setup) using mock interfaces.
+The test suite covers Alexa request handling, session flows, validation, and Google Sheets operations through mocks.
 
 ## License
 

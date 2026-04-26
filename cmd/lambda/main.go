@@ -24,7 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	secretName := os.Getenv("GOOGLE_CREDENTIAL_SECRET")
+	secretName := os.Getenv("GOOGLE_CREDENTIALS_SECRET")
 	if secretName == "" {
 		slog.Error("GOOGLE_CREDENTIALS_SECRET is required")
 		os.Exit(1)

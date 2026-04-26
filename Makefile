@@ -3,7 +3,7 @@
 # ──────────────────────────────────────────────────
 
 FUNCTION_NAME ?= alexa-attendance-skill
-REGION        ?= eu-west-1
+REGION        ?= sa-east-1
 ROLE_NAME     ?= alexa-skill-lambda-role
 SECRET_NAME   ?= alexa-skill/google-credentials
 

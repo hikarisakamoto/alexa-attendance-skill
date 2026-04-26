@@ -14,13 +14,13 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	sheetID := os.Getenv("GOOGLE_SHEED_ID")
+	sheetID := os.Getenv("GOOGLE_SHEET_ID")
 	if sheetID == "" {
 		slog.Error("GOOGLE_SHEET_ID is required")
 		os.Exit(1)
 	}
 
-	secretName := os.Getenv("GOOGLE_CREDENTIALS_SECERT")
+	secretName := os.Getenv("GOOGLE_CREDENTIALS_SECRET")
 	if secretName == "" {
 		slog.Error("GOOGLE_CREDENTIALS_SECRET is required")
 		os.Exit(1)
