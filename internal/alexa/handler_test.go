@@ -151,8 +151,8 @@ func TestHandleAlexaRequest(t *testing.T) {
 				},
 			},
 			mock:       &mockSheetsService{},
-			wantSpeech: "Entendido. Maria Souza foi registrado como presente.",
-			wantEnd:    true,
+			wantSpeech: "Entendido. Maria Souza foi registrado como presente. Quem mais?",
+			wantEnd:    false,
 		},
 		{
 			name:          "Departure Intent Success",
@@ -169,8 +169,8 @@ func TestHandleAlexaRequest(t *testing.T) {
 				},
 			},
 			mock:       &mockSheetsService{},
-			wantSpeech: "Entendido. A saída de Carlos Pereira foi registrada.",
-			wantEnd:    true,
+			wantSpeech: "Entendido. A saída de Carlos Pereira foi registrada. Quem mais?",
+			wantEnd:    false,
 		},
 		{
 			name:          "Departure Intent No Open Arrival asks confirmation",

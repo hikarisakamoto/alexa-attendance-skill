@@ -120,7 +120,7 @@ func handleDeparture(ctx context.Context, intent Intent, sheetsService SheetsSer
 		return buildResponse("Desculpe, tive um problema ao registrar a saída. Tente novamente.", false)
 	}
 
-	return buildResponse(fmt.Sprintf("Entendido. A saída de %s foi registrada.", name), true)
+	return buildResponse(fmt.Sprintf("Entendido. A saída de %s foi registrada. Quem mais?", name), false)
 }
 
 func handleYes(ctx context.Context, session Session, sheetsService SheetsService) Response {
@@ -155,7 +155,7 @@ func handleArrival(ctx context.Context, intent Intent, sheetsService SheetsServi
 		return buildResponse("Desculpe, tive um problema ao registrar a chegada. Tente novamente.", false)
 	}
 
-	return buildResponse(fmt.Sprintf("Entendido. %s foi registrado como presente.", name), true)
+	return buildResponse(fmt.Sprintf("Entendido. %s foi registrado como presente. Quem mais?", name), false)
 }
 
 func extractName(intent Intent) string {
